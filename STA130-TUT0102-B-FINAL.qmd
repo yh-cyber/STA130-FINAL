@@ -1,0 +1,550 @@
+---
+title: "What Distinguishes Acessible Electricity Systems in Africa?"
+subtitle: "A Comparative Analysis of Electricity Accessibility Across African Countries"
+author: "Group TUT0102-B: Yusyra Hossain, Yara Megahed, Noha Rouame, Daniel Markusson"
+date: today
+format:
+  beamer:
+    theme: Madrid
+    colortheme: default
+    fonttheme: serif
+    aspectratio: 169
+    slide-level: 2
+    toc: false
+    incremental: false
+    pdf-engine: pdflatex
+    keep-tex: false
+editor: visual
+---
+
+```{r setup, include=FALSE}
+library(gridExtra)
+library(tidyverse)
+library(broom)
+library(knitr)
+library(cowplot)
+knitr::opts_chunk$set(
+echo = FALSE,
+include = TRUE,
+warning = FALSE,
+message = FALSE,
+results = "markup",
+fig.width = 6,
+fig.height = 3.5,
+fig.align = "center",
+out.width = "80%"
+)
+```
+
+```{r load-data, echo=FALSE}
+### Read in data
+CATF_data <- read_csv("CATF_data.csv")
+```
+
+```{r clean_data, include=FALSE}
+
+## Clean the data 
+
+## E.g., remove unrealistic populations
+#CATF_data |> arrange(population) |> View()
+
+#CATF_data <- CATF_data |> filter(population > 100)
+## Alternatively, we could convert  them to the correct values for each country by 
+## seeing roughly what the population values for each country are and scaling up accordingly.
+
+
+# ============================================================
+# Aggregate CATF_data: one row per country
+# ============================================================
+# Each country has multiple rows (one per student). We collapse
+# them into a single row using sensible summary functions.
+#
+# General strategy:
+#   - numeric columns  → median  (robust to outliers / typos)
+#   - character columns → mode   (most common value reported)
+#
+# Feel free to swap median() for mean() or mode() on any
+# variable if you think a different choice is more appropriate.
+# ============================================================
+
+
+# --- helper function: statistical mode (most frequent value) ----
+# works for both character and numeric vectors
+stat_mode <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) == 0) return(NA)
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+# --- identify column types --------------------------------------
+numeric_cols <- CATF_data |>
+  select(where(is.numeric)) |>
+  names()
+
+character_cols <- CATF_data |>
+  select(where(is.character), -country) |>
+  names()
+
+# --- aggregate -----------------------------------------------
+CATF_clean <- CATF_data |>
+  group_by(country) |>
+  summarise(
+    # For every numeric column, take the median (ignoring NAs)
+    across(all_of(numeric_cols), function(x){ median(x, na.rm = TRUE) }),
+
+    # For every character column, take the mode
+    across(all_of(character_cols), stat_mode),
+
+    # (optional) track how many student rows were combined
+    n_sources = n()
+  )
+
+gdp_ens_data <- CATF_clean |>
+  select(country, gdp, ENS) |>
+  drop_na()
+
+
+# --- quick check ---------------------------------------------
+#glimpse(CATF_clean)
+
+# How many unique countries do we have?
+#nrow(CATF_clean)
+
+# ============================================================
+# CUSTOMISATION IDEAS
+# ============================================================
+# If you'd prefer to use the mean for some variables and the
+# median for others, you can split them up like this:
+#
+# CATF_clean <- CATF_data |>
+#   group_by(country) |>
+#   summarise(
+#     # Variables where mean makes sense
+#     across(c(gdp, population),
+#            function(x){ mean(x, na.rm = TRUE) } ),
+#
+#     # Variables where median is more robust
+#     across(c(poverty_rate, hdi, median_age),
+#            function(x){ median(x, na.rm = TRUE) } ),
+#
+#     # Variables where mode makes sense (e.g. categorical-ish)
+#     across(c(renewable_target_solar, renewable_target_wind),
+#            stat_mode),
+#
+#     n_sources = n()
+#   )
+# ============================================================
+
+
+```
+
+## Introduction
+
+**Overall Theme:** Electricity systems across African countries vary widely in different factors. Understanding these factors associated with more equal access to electricity can help organizations like CATF (i.e. a non-profit organization providing policy and technology solutions to energy problems) to design more effective solutions.
+
+**Research Goal:**  In this project, we will explore which factors are associated with stronger electricity access. The main things we will analyze are: *infrastructure expansion, economic development, inequality in electricity access, poverty outcomes.*
+
+**Target Population:** The overall electricity access across all African countries.
+
+**Audience:** For staff in companies like CATF (non-statisticians), so they could make more informed decisions about what factors to invest in.
+
+## Question #1: \[Yusyra Hossain - Relationship of Infrastructure Distribution and Electricity Access\]
+
+Do countries with greater infrastructure distribution have higher electricity access?
+
+Why this matters for the CATF:
+
+-   To show whether infrastructure investment improves electricity access or not
+
+## Q1: Variables & Approach
+
+**Variables used:**
+
+-   Transmission Expansion Rate: Electricity Distribution Expansion Rates per km
+-   Electrification Rate: % of population with electricity access
+-   Population
+
+**New variables defined:**
+
+-   Infrastructure per Capita = Transmission Expansion Rate / Population
+
+**Approach**:
+
+-   Create a new variable measuring infrastructure expansion per capita, then use a scatter plot of infrastructure expansion per capita vs. electrification rate to examine whether countries investing more in electricity infrastructure tend to have higher electricity access.
+
+## Q1: Visualization
+
+```{r q1-plot}
+#Your plot code here 
+CATF_clean <- CATF_clean |> 
+mutate(infra_per_capita = transmission_distn_expansion_rate / population)
+
+ggplot(CATF_clean, aes(x = infra_per_capita, y = electrification_rate)) +
+  geom_point() +
+  scale_x_log10() + 
+  geom_smooth(method = "lm", se = FALSE, color = "blue") + 
+  labs(
+    title = "Infrastructure Expansion and Electricity Access",
+    x = "Infrastructure Expansion per Capita (log10)",
+    y = "Electrification Rate (%)"
+  )
+
+```
+
+## Q1: Summary Table
+
+```{r q1-table}
+#Your summary table here
+
+# Here is an example of a nicely formatted table, using the kable function
+CATF_clean |>
+  mutate(infra_per_capita = transmission_distn_expansion_rate / population) |>
+  summarise(
+    infra_mean = mean(infra_per_capita),
+    infra_median = median(infra_per_capita),
+    electrification_mean = mean(electrification_rate),
+    electrification_median = median(electrification_rate)
+) |>
+  kable(caption = "Summary Statistics: Infrastructure and Electrification")
+
+```
+
+-   Infra Mean: Average infrastructure expansion per capita is very low across the sampled African countries, so big difference in population size vs investment levels.
+
+-   Infra median: The median is much smaller though, so that means that a few countries have much higher infrastructure per capita, pulling the mean up.
+
+-   Electrification mean: Mean and median is roughly the same, \~ 60%, indicating that most countries cluster around the moderate levels of electricity access.
+
+-   So it's the infrastructure investment that is not evenly distributed.
+
+## Q1: Insights
+
+-   The regression line slopes upward, so countries with higher infrastructure expansion per capita tend to have higher electrification rates. However, the points are widely scattered, meaning the relationship is pretty weak.
+
+-   This suggests that other factors likely influence electrification (economic development, policy, geography, etc.). 
+
+-   Therefore, while infrastructure expansion may contribute to improved electrification, from this data, we can infer that it does not directly affect electricity accessibility across African countries.
+
+-   Limitations:
+
+    -   The variable *transmission and distribution expansion rate* may not really reflect actual improvements in infrastructure. For example, expanding infrastructure does not guarantee it is good quality.
+
+## Question #2: \[Yara Megahed - Relationship of poverty rate and electrification\]
+
+What is the correlation between poverty rate and electricity access across countries in Africa?
+
+Why does this matter for CATF: 
+
+-   Its important to note how much access poor countries have to electricity, as it could undermine economic and productivity aspects within the country.
+
+## Q2: Variables & Approach
+
+**Variables used:**
+
+-   poverty rate: proportion of total population below poverty line (a quantitative variable)
+-   electrification rate: proportion of total population with access to electricity (a quantitative variable)
+-   No new variables defined
+
+**Approach:**
+
+-   Use a scatter plot with a fitted linear regression line and a simple linear regression model of electrification rate on poverty rate to examine whether countries with higher poverty rates tend to have lower electricity access.
+
+## Q2: Visualization
+
+```{r q2-plot}
+#Your plot code here 
+CATF_clean |> ggplot(aes(x= poverty_rate, y= electrification_rate)) + 
+              geom_point(color= "black", 
+                         fill = "grey") + 
+              geom_smooth(method= "lm", se= FALSE) + 
+              labs(title= "Linear Regression Model of the Relationship Between Poverty Rate \n and Electrification Rate", 
+                   x= "Poverty Rate", 
+                   y= "Electrification Rate") +
+              theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Q2: Summary Table
+
+```{r q2-table}
+CATF_clean |> 
+  mutate(poverty_rate = case_when(0.0 < poverty_rate & poverty_rate <= 0.2 ~ "Low", 
+                                   0.2 < poverty_rate & poverty_rate <= 0.5 ~ "Medium",                                    
+                                   0.5 < poverty_rate & poverty_rate <= 0.8 ~ "High",
+                                   0.8 < poverty_rate & poverty_rate <= 1 ~ "Severe")) |>
+  group_by(poverty_rate) |>
+  summarise(
+    min_electrification = round(min(electrification_rate), 1),
+    max_electrification = round(max(electrification_rate), 1),
+    mean_electrification = round(mean(electrification_rate), 1)) |> 
+  kable(caption = "Statistics by Poverty Group")
+
+```
+
+------------------------------------------------------------------------
+
+## Q2: Insights
+
+-   The scatter plot shows a negative relationship between poverty rate and electrification rate. Countries with higher poverty rates generally tend to have lower electricity access.
+
+-   As more of a country's population falls below the poverty line, fewer people have access to electricity. The linear regression line indicates that increased poverty correlates with decreased electricity access.
+
+-   p-value is \< 2.2e-16 so it isnt reported by R, which means that the p value is significantly small enough to reject the null hypothesis that there is no correlation between poverty rate and electrification rate.
+
+-   Limitations:
+
+    -   There may be other predictor variables that influence electrification rate aside from poverty rate such as oil/ electricity reserves for each country.
+
+## Question #3: \[Noha Rouame - **Economic Capacity and Reliability**\]
+
+Are wealthier countries associated with more reliable electricity systems?
+
+\
+**Why does this matter for CATF:** 
+
+-   Countries with higher income levels tend have more resources to invest in electrical infrastructure. 
+
+-   Understanding whether GDP per capita relates to reliability can help the CATF identify structural challenges in electricity systems across African countries. 
+
+## Q3: Variables & Approach
+
+**Variables used:**
+
+-   GDP (GDP per capita in USD):  Measures the average economic output per person in a country
+
+-   Energy Not Supplied (ENS): Measures the amount of electricity demand that could not be met due to outages (Higher ENS indicates more frequent or longer electricity outages)
+
+    Calculated by: ENS = summation of(load × outage time)
+
+**New variables/groups defined:**
+
+-   GDP Group: categorical variable made to group countries based on their GDP per capita level: Low GDP (below 3000 USD), Medium GDP (between 3000 and 10000 USD) , High GDP (above 10000 USD). This makes it easier for us to compare electricity reliability across different levels of economic development.
+
+## Q3: Visualization
+
+```{r q3-plot}
+ggplot(gdp_ens_data, aes(x= gdp, y = ENS))+
+  geom_point(size = 2, alpha =  0.7) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "GDP per Capita and Energy Not Supplied",
+    subtitle = "Each point represents one African country",
+    x = "GDP per capita (USD)",
+    y = "Energy Not Supplied (ENS)",
+    caption = "Higher ENS means more electricity was not supplied because of outages."
+    )+
+  theme_minimal()
+
+```
+
+## Q3: Summary Table
+
+```{r q3-table}
+#Your summary table here
+
+# Here is an example of a nicely formatted table, using the kable function
+lm(ENS ~ gdp, data = gdp_ens_data) |>
+  tidy() |>
+  kable(digits = 4, caption = "Linear Regression: GDP per Capita and ENS")
+```
+
+```{r q3-table2}
+# Here is an example of a nicely formatted table, using the kable function
+gdp_ens_data |>
+  mutate(
+    GDP_Group = case_when(
+      gdp < 3000 ~ "Low GDP", 
+      gdp < 10000 ~ "Medium GDP", 
+      TRUE ~ "High GDP"
+    )
+  ) |>
+  group_by(GDP_Group) |>
+  summarise (
+    Countries = n(), 
+    'Avg GDP per Capita (USD)' = round(mean(gdp), 0),
+    'Avg Energy Not Supplied (ENS)' = round(mean(ENS), 2)
+  ) |>
+  kable(caption = "Electricity Reliability by GDP per Capita Group")
+
+```
+
+------------------------------------------------------------------------
+
+## Q3: Insights
+
+-   Higher ENS values indicate more electricity outages, meaning electricity demand was not fully supplied.
+
+-   The trend line shows a weak negative relationship between GDP and ENS =\> countries with higher GDP experience fewer electricity outages indicating generally more reliable electricity systems.
+
+-   The regression p-value (0.408) indicates that the relationship between GDP per capita and ENS is not statistically significant.
+
+-   This suggests that GDP per capita alone does not strongly determine electricity reliability, and other factors such as infrastructure and investment play a significant role.
+
+-   Limitations: - ENS data may vary in quality or measurements across countries.
+
+    -   Factors such as: grid infrastructure, energy policy and investment levels were not taken into account in this analysis .
+
+## Question #4: \[Daniel Markusson - **Inequality in Electricity Access**\]
+
+**Is there a statistically significant difference between electrification rates in urban and rural areas?**
+
+Why the CATF should care:
+
+Highlights geographic inequality in electricity infrastructure. As can be seen, greater disparity between electrification of urban and rural populations is associated with greater poverty in Africa.
+
+## Q4: Variables & Approach
+
+**Variables used:**
+
+-   Urban Access Electricity Rate: % of urban population with electricity access
+-   Rural Access Electricity Rate: % of rural population with electricity access
+-   No new variables defined
+
+**Approach:**
+
+-   Use boxplots to compare urban and rural electrification rates across countries, and perform a hypothesis test on the difference between urban and rural electrification rates to determine whether the average difference between them is statistically significant.
+
+## Q4: Visualization
+
+```{r q4-plot}
+#Your plot code here 
+df_electricity <- CATF_clean %>% select(country, urban_access_electricity_rate, rural_access_electricity_rate) %>% na.omit()
+```
+
+```{r q4-plot2}
+df_long <- df_electricity |>
+  pivot_longer(
+    cols = c(urban_access_electricity_rate, rural_access_electricity_rate),
+    names_to = "area",
+    values_to = "electrification_rate"
+  ) |>
+  mutate(area = recode(
+    area,
+    urban_access_electricity_rate = "Urban",
+    rural_access_electricity_rate = "Rural"
+  ))
+
+
+Q4_plot <- ggplot(df_long, aes(x = area, y = electrification_rate)) +
+  geom_boxplot(fill = "lightblue", color = "black") +
+  labs(
+    title = "Urban vs Rural Electrification Rates",
+    x = "Area Type",
+    y = "Electrification Rate (%)"
+  )
+
+Q4_plot
+```
+
+```{r q4-plot3}
+df_electricity <- df_electricity |>
+  mutate(difference = urban_access_electricity_rate - rural_access_electricity_rate)
+
+Q4_test_stat <- mean(df_electricity$difference)
+
+Q4_test_stat
+
+
+set.seed(1011994941)
+
+n_trials <- 1000
+Q4_simulated_stats <- rep(NA, n_trials)
+
+for (i in 1:n_trials) {
+  random_signs <- sample(c(-1, 1), size = nrow(df_electricity), replace = TRUE)
+  
+  simulated_differences <- df_electricity$difference * random_signs
+  
+  Q4_simulated_stats[i] <- mean(simulated_differences)
+}
+
+Q4_pvalue <- mean(abs(Q4_simulated_stats) >= abs(Q4_test_stat))
+
+Q4_pvalue
+
+Q4_decision <- Q4_pvalue < 0.05
+
+Q4_decision
+
+```
+
+## Q4: Summary Table
+
+```{r q4-table}
+#Your summary table here
+
+
+Q4_summary_table <- tibble(
+  statistic = c(
+    "Mean urban electrification rate (%)",
+    "Mean rural electrification rate (%)",
+    "Mean paired difference (Urban - Rural)",
+    "Number of countries",
+    "Simulation-based p-value",
+    "Decision at alpha = 0.05"
+  ),
+  value = c(
+    round(mean(df_electricity$urban_access_electricity_rate), 2),
+    round(mean(df_electricity$rural_access_electricity_rate), 2),
+    round(Q4_test_stat, 2),
+    nrow(df_electricity),
+    round(Q4_pvalue, 4),
+    ifelse(Q4_decision,
+           "Reject H0",
+           "Fail to reject H0")
+  )
+)
+
+kable(Q4_summary_table, col.names = c("Statistic", "Value"))
+
+```
+
+------------------------------------------------------------------------
+
+## Q4: Insights
+
+Null hypothesis ($H_0$): Mean difference between urban and rural electrification rates is 0.\
+$$\mu_{\text{urban} - \text{rural}} = 0$$Alternative hypothesis **(**$H_A$): Mean difference between urban and rural electrification rates is not 0.\
+$$\mu_{\text{urban} - \text{rural}} \ne 0$$
+
+-   P value of \< 2.2e-16. We can safely reject our null hypothesis - meaning the difference we observed between urban and rural electrification rates is extremely unlikely to be due to random chance. This gives us strong evidence that urban areas have higher access to electricity than rural areas across African countries.
+
+-   Limitations:
+
+    -   What counts as “urban” in one country may still have limited infrastructure compared to another.
+
+## Overall Conclusion
+
+**Key Findings:**
+
+-   Countries with more transmission & distribution expansion tend to have higher electricity access; but this correlation is *not strong*.
+
+-   Clear negative relationship: higher poverty → lower electrification rates ; *Strong evidence.*
+
+-   Higher GDP per capita is associated with slightly fewer outages (lower ENS); but this correlation is also *not strong*.
+
+-   Urban areas have significantly higher electrification rates than rural areas; *Strong evidence*
+
+-   Overall, the analysis suggests that [economic development]{.underline} is closely linked to electricity access and reliability across African countries. But, inequality between rural and urban areas is still significant in these countries.
+
+---
+
+**Policy Implication for the CAFT:**
+
+Thus, the key priorities investments should focus on right now are:
+
+-   Poverty reduction
+
+-   Equitable infrastructure distribution (Reducing inequality in access)
+
+-   Rural electrification, and complementing this infrastructure with *economic support*
+
+**Limitations:**
+
+-   Measurement differences: Variables like Energy Not Supplied (ENS) and infrastructure expansion may not be measured consistently across countries.
+
+-   Other factors not included: governance, energy policy, geography.
+
+-   Results across all African countries may not apply to specific countries with unique conditions.
+
+-   Future research could track countries over multiple years to better understand cause-and-effect relationships, as the methods used in this research may have overly simplified.
