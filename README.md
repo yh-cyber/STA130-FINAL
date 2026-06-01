@@ -1,5 +1,6 @@
-# Final STA130 Project:
-A Comparative Analysis of Electricity Accessibility Across African Countries
+# A Comparative Analysis of Electricity Accessibility Across African Countries
+STA130 Final Project
+
 Originally done on JupyterHub
 
 ## Overview 
